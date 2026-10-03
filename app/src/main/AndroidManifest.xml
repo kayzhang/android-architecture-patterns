@@ -11,6 +11,16 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AndriodArchitecture">
+        <!--
+            CounterActivity uses AppCompatActivity + XML Views, which requires
+            a Theme.AppCompat theme. The app-level theme (Theme.AndriodArchitecture)
+            is a Material3/Compose theme that is NOT AppCompat-compatible.
+            Setting the theme here overrides only for this Activity.
+        -->
+        <activity
+            android:name=".feature.counter.CounterActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.DarkActionBar" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
