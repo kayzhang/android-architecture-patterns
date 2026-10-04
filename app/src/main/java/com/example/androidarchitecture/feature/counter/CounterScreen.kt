@@ -1,23 +1,28 @@
 package com.example.androidarchitecture.feature.counter
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 /**
- * Counter screen — placeholder.
- * Pattern-specific implementation will be added on pattern branches.
+ * CounterScreen — launches the CounterActivity (XML Views + MVP).
+ * The actual MVP implementation lives in CounterActivity, CounterPresenter,
+ * CounterView, and CounterModel.
  */
 @Composable
 fun CounterScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -26,20 +31,21 @@ fun CounterScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Counter",
+            text = "Counter (MVP)",
             style = MaterialTheme.typography.headlineMedium
         )
         Text(
-            text = "Pattern implementation goes here",
-            style = MaterialTheme.typography.bodyMedium
+            text = "Uses Activity + XML Views + Presenter + View Interface",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(top = 8.dp)
         )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun CounterScreenPreview() {
-    MaterialTheme {
-        CounterScreen()
+        Button(
+            onClick = {
+                context.startActivity(Intent(context, CounterActivity::class.java))
+            },
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
+            Text("Open Counter")
+        }
     }
 }
