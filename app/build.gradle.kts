@@ -53,6 +53,9 @@ dependencies {
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
+    // Loader (legacy — retained Controller across config changes, replaced by ViewModel)
+    implementation("androidx.loader:loader:1.1.0")
+
     // Test
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

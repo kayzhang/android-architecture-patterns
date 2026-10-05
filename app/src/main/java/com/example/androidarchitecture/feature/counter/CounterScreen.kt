@@ -15,9 +15,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 /**
- * CounterScreen — launches the CounterActivity (XML Views + MVC).
+ * CounterScreen — launches the CounterActivity (XML Views + MVC + Loader).
  * The actual MVC implementation lives in CounterActivity, CounterController,
- * and CounterModel — using Activity + XML layout, not Compose.
+ * ControllerLoader, and CounterModel — using Activity + XML layout, not Compose.
  */
 @Composable
 fun CounterScreen(modifier: Modifier = Modifier) {
@@ -31,11 +31,11 @@ fun CounterScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Counter (MVC)",
+            text = "Counter (MVC + Loader)",
             style = MaterialTheme.typography.headlineMedium
         )
         Text(
-            text = "Uses Activity + XML Views + Controller",
+            text = "Uses Activity + XML Views + Controller + Loader retention",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(top = 8.dp)
         )
