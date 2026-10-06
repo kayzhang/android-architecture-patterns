@@ -12,19 +12,21 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * CounterViewModel — lightweight MVI pattern.
+ * CounterViewModel — lightweight MVI pattern with a pure reducer.
  *
- * Data flow is STRICTLY UNIDIRECTIONAL and enforced:
- * - View emits Intent → processIntent() → Reducer → new State → View observes
- * ALL state changes go through this single path. There is no other way to
- * update the State — no scattered setState calls, no multiple entry points.
- * Compare with MVVM where any method can update any StateFlow.
+ * Data flow is STRICTLY UNIDIRECTIONAL:
+ *   View → Intent → handleSideEffect() → SideEffectResult → reduce() → State → View
  *
- * - Single State object (CounterState) — single source of truth
- * - Single entry point (processIntent) — all user actions go through here
- * - Reducer calls Model and maps result into new State
- * - One-shot effects (toast, navigation) delivered via Channel, not State
- * - Survives configuration changes automatically (ViewModel class feature)
+ * The key separation:
+ * - handleSideEffect(): IMPURE — mutates the Model, returns a SideEffectResult + optional Effect
+ * - reduce():           PURE  — maps (State + SideEffectResult) → new State, no side effects
+ *
+ * This means the reducer is deterministic and trivially testable:
+ * given the same (oldState, sideEffectResult), it always returns the same newState.
+ * Side effect logic is tested separately through the ViewModel's public API.
+ *
+ * Compare with MVVM where any method can update any StateFlow — here ALL
+ * state changes flow through a single path via reduce().
  */
 class CounterViewModel : ViewModel() {
 
@@ -39,32 +41,54 @@ class CounterViewModel : ViewModel() {
     val effect: Flow<CounterEffect> = _effect.receiveAsFlow()
 
     fun processIntent(intent: CounterIntent) {
-        _state.update { oldState -> reduce(oldState, intent) }
+        val (result, effect) = handleSideEffect(intent)
+        _state.update { oldState -> reduce(oldState, result) }
+        effect?.let { postEffect(it) }
     }
 
+    /**
+     * Pure reducer: (State, SideEffectResult) → State.
+     * No side effects, no model calls. Same input always produces same output.
+     */
     private fun reduce(
         oldState: CounterState,
-        intent: CounterIntent
+        result: CounterSideEffectResult
     ): CounterState =
+        when (result) {
+            is CounterSideEffectResult.CountUpdated ->
+                oldState.copy(count = result.count, error = null)
+
+            is CounterSideEffectResult.SetCountFailed ->
+                oldState.copy(error = result.message)
+        }
+
+    /**
+     * Side effect handler: (Intent) → (SideEffectResult, Effect?).
+     * IMPURE — mutates the Model and produces a SideEffectResult for the reducer,
+     * plus an optional one-shot Effect for the UI.
+     */
+    private fun handleSideEffect(
+        intent: CounterIntent
+    ): Pair<CounterSideEffectResult, CounterEffect?> =
         when (intent) {
             is CounterIntent.Increment -> {
                 model.increment()
-                oldState.copy(count = model.getCount(), error = null)
+                CounterSideEffectResult.CountUpdated(model.getCount()) to null
             }
 
             is CounterIntent.Reset -> {
                 model.reset()
-                oldState.copy(count = model.getCount(), error = null)
+                CounterSideEffectResult.CountUpdated(model.getCount()) to null
             }
 
             is CounterIntent.SetCount -> {
                 model.setCount(intent.value).fold(
                     onSuccess = {
-                        oldState.copy(count = model.getCount(), error = null)
+                        CounterSideEffectResult.CountUpdated(model.getCount()) to null
                     },
                     onFailure = { e ->
-                        postEffect(CounterEffect.ShowToast(e.message ?: "Error"))
-                        oldState.copy(error = e.message)
+                        CounterSideEffectResult.SetCountFailed(e.message ?: "Error") to
+                            CounterEffect.ShowToast(e.message ?: "Error")
                     }
                 )
             }
