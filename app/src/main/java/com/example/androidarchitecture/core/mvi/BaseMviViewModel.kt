@@ -12,17 +12,21 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * BaseMviViewModel — a reusable generic base for Redux-like MVI.
+ * BaseMviViewModel — a reusable generic base for Redux-like MVI with a pure reducer.
  *
- * Every screen defines its own State (S), Intent (I), and optional Effect (E),
- * then extends this class and implements reduce(). This ensures every feature
- * follows the same MVI structure consistently.
+ * Every screen defines its own State (S), Intent (I), SideEffectResult (R), and
+ * optional Effect (E), then extends this class and implements:
+ * - handleSideEffect(): (Intent) → Pair<SideEffectResult, Effect?> — IMPURE, executes side effects
+ * - reduce(): (State, SideEffectResult) → State — PURE, maps results into new state
+ *
+ * The flow is: Intent → handleSideEffect → SideEffectResult → reduce → State
  *
  * @param S The screen's State type (immutable data class)
  * @param I The screen's Intent type (sealed interface of user actions)
+ * @param R The screen's SideEffectResult type (sealed interface of side effect outcomes)
  * @param E One-shot Effects the UI handles exactly once (toast, navigation)
  */
-abstract class BaseMviViewModel<S, I, E>(
+abstract class BaseMviViewModel<S, I, R, E>(
     initialState: S
 ) : ViewModel() {
 
@@ -40,26 +44,28 @@ abstract class BaseMviViewModel<S, I, E>(
     /**
      * Single entry point for all user actions.
      *
-     * State is updated via StateFlow.update(), which is atomic.
-     * The effect is captured from the reduce result and emitted AFTER
-     * the new state has been committed — keeping the reduce function
-     * side-effect free.
+     * 1. handleSideEffect() executes impure logic and produces a SideEffectResult + optional Effect
+     * 2. reduce() purely maps (oldState + result) into newState
+     * 3. Effect (if any) is emitted to the Channel for one-shot UI consumption
      */
     fun processIntent(intent: I) {
-        var pendingEffect: E? = null
-        _viewState.update { oldState ->
-            val (newState, effect) = reduce(oldState, intent)
-            pendingEffect = effect
-            newState
-        }
-        pendingEffect?.let { postEffect(it) }
+        val (result, effect) = handleSideEffect(intent)
+        _viewState.update { oldState -> reduce(oldState, result) }
+        effect?.let { postEffect(it) }
     }
 
     /**
-     * The child ViewModel implements this — the pure reducer.
-     * Takes (oldState + intent) and returns (newState + optional effect).
+     * Side effect handler — IMPURE.
+     * Executes Model mutations, API calls, etc. and returns a SideEffectResult
+     * plus an optional one-shot Effect.
      */
-    protected abstract fun reduce(oldState: S, intent: I): Pair<S, E?>
+    protected abstract fun handleSideEffect(intent: I): Pair<R, E?>
+
+    /**
+     * Pure reducer: (State, SideEffectResult) → State.
+     * No side effects. Same input always produces the same output.
+     */
+    protected abstract fun reduce(oldState: S, result: R): S
 
     protected fun postEffect(effect: E) {
         viewModelScope.launch {

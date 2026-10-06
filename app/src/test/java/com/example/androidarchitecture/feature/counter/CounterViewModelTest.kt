@@ -7,6 +7,8 @@ import org.junit.Test
 
 class CounterViewModelTest {
 
+    // --- Integration tests: processIntent end-to-end ---
+
     @Test
     fun `initial state is count 0 with no error`() {
         val vm = CounterViewModel()

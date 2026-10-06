@@ -5,46 +5,63 @@ import com.example.androidarchitecture.core.mvi.BaseMviViewModel
 /**
  * CounterViewModel — Redux-like MVI, extends BaseMviViewModel.
  *
- * Compare with lightweight MVI:
- * - Lightweight: writes its own StateFlow + processIntent + reduce inline
- * - Redux-like: extends BaseMviViewModel which provides the infrastructure,
- *   only implements reduce() — the pure function
+ * Implements two abstract methods:
+ * - handleSideEffect(): IMPURE — mutates Model, returns SideEffectResult + optional Effect
+ * - reduce():           PURE  — maps (State, SideEffectResult) → new State
  *
- * The reduce function returns Pair(newState, effect?):
- * - newState → goes to StateFlow (persistent, View observes)
- * - effect → goes to Channel (one-shot, View consumes once)
+ * The base class orchestrates the flow:
+ *   Intent → handleSideEffect → (SideEffectResult, Effect?) → reduce → State
  */
-class CounterViewModel : BaseMviViewModel<CounterState, CounterIntent, CounterEffect>(
+class CounterViewModel : BaseMviViewModel<CounterState, CounterIntent, CounterSideEffectResult, CounterEffect>(
     initialState = CounterState()
 ) {
     private val model = CounterModel()
 
-    override fun reduce(
-        oldState: CounterState,
+    /**
+     * Side effect handler — IMPURE.
+     * Mutates the Model and returns a SideEffectResult for the reducer,
+     * plus an optional one-shot Effect for the UI.
+     */
+    override fun handleSideEffect(
         intent: CounterIntent
-    ): Pair<CounterState, CounterEffect?> {
-        return when (intent) {
+    ): Pair<CounterSideEffectResult, CounterEffect?> =
+        when (intent) {
             is CounterIntent.Increment -> {
                 model.increment()
-                CounterState(count = model.getCount()) to null
+                CounterSideEffectResult.CountUpdated(model.getCount()) to null
             }
 
             is CounterIntent.Reset -> {
                 model.reset()
-                CounterState(count = model.getCount()) to null
+                CounterSideEffectResult.CountUpdated(model.getCount()) to null
             }
 
             is CounterIntent.SetCount -> {
                 model.setCount(intent.value).fold(
                     onSuccess = {
-                        CounterState(count = model.getCount()) to null
+                        CounterSideEffectResult.CountUpdated(model.getCount()) to null
                     },
                     onFailure = { e ->
-                        oldState.copy(error = e.message) to
+                        CounterSideEffectResult.SetCountFailed(e.message ?: "Error") to
                             CounterEffect.ShowToast(e.message ?: "Error")
                     }
                 )
             }
         }
-    }
+
+    /**
+     * Pure reducer: (State, SideEffectResult) → State.
+     * No side effects, no model calls. Same input always produces same output.
+     */
+    override fun reduce(
+        oldState: CounterState,
+        result: CounterSideEffectResult
+    ): CounterState =
+        when (result) {
+            is CounterSideEffectResult.CountUpdated ->
+                oldState.copy(count = result.count, error = null)
+
+            is CounterSideEffectResult.SetCountFailed ->
+                oldState.copy(error = result.message)
+        }
 }
